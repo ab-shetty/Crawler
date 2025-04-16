@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawler Control Panel</title>
+    <link rel="stylesheet" href="/static/styles.css"> <!-- Link to CSS -->
+</head>
+<body>
+    <div class="container">
+        <h1>Crawler Control Panel</h1>
+
+        <form id="crawlForm">
+            <div class="form-group">
+                <label for="url">Website URL:</label>
+                <input type="url" id="url" name="url" required placeholder="https://example.com">
+            </div>
+
+            <div class="form-group">
+                <label for="instructions">Instructions:</label>
+                <textarea id="instructions" name="instructions" rows="3" placeholder="e.g., Extract all headings and paragraphs"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="depth">Crawl Depth (for future use):</label>
+                <input type="number" id="depth" name="depth" min="0" value="0">
+            </div>
+
+            <button type="submit" id="submitBtn">Start Scraping</button>
+        </form>
+
+        <div id="loading" class="loading" style="display: none;">Processing...</div>
+
+        <h2>Results:</h2>
+        <div id="results">
+            <pre>Submit the form to see results here.</pre> <!-- Placeholder -->
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script> <!-- Link to JavaScript -->
+</body>
+</html>
