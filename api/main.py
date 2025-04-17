@@ -19,7 +19,7 @@ sys.path.append(str(project_root))
 from .schemas import CrawlRequest, CrawlResponse # Use relative import for schemas
 # Import your crawler client (adjust if your class name is different)
 try:
-    from crawler import SimpleCrawlerClient, SimpleCrawlerError
+    from crawler import SimpleCrawlerClient, CrawlerError
 except ImportError:
     print("Error: Could not import SimpleCrawlerClient from the 'crawler' package.")
     print("Ensure the 'crawler' directory exists and is in the Python path.")

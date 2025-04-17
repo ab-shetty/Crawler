@@ -1,8 +1,19 @@
 # crawler/__init__.py
 
-# Expose the main client class for easier imports
-from .client import CrawlerClient
-from .exceptions import CrawlerError
+# Import and expose the main client classes and exceptions
+from .client import SimpleCrawlerClient
+from .crawler_client import CrawlerClient
+from .exceptions import CrawlerError, CrawlingError, ContentProcessingError, ConfigurationError
 
-__all__ = ['CrawlerClient', 'CrawlerError']
-__version__ = "0.1.0" # Example version
+# Version information
+__version__ = "0.1.0"
+
+# Export these classes/functions for easier imports
+__all__ = [
+    'SimpleCrawlerClient',
+    'CrawlerClient',
+    'CrawlerError',
+    'CrawlingError',
+    'ContentProcessingError',
+    'ConfigurationError'
+]
