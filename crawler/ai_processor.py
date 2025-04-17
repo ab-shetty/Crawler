@@ -203,9 +203,9 @@ class AiProcessor:
             Only include information explicitly found on the page.
             """
             
-            # Call OpenAI API with longer context and output
+            # Call OpenAI API
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini-2024-07-18",  # Model with larger context window
+                model="gpt-4o-mini-2024-07-18", 
                 messages=[
                     {"role": "system", "content": "You are a precise web content extraction assistant."},
                     {"role": "user", "content": prompt}
