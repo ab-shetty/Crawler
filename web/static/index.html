@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crawler Control Panel</title>
-    <link rel="stylesheet" href="/static/styles.css"> <!-- Link to CSS -->
+    <title>Crawler - AI Web Scraping Tool</title>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="container">
-        <h1>Crawler Control Panel</h1>
+        <header>
+            <h1>Crawler - AI Web Scraping Tool</h1>
+            <p class="subtitle">Extract relevant data from websites using natural language instructions</p>
+        </header>
 
         <form id="crawlForm">
             <div class="form-group">
@@ -17,26 +20,69 @@
             </div>
 
             <div class="form-group">
-                <label for="instructions">Instructions:</label>
-                <textarea id="instructions" name="instructions" rows="3" placeholder="e.g., Extract all headings and paragraphs"></textarea>
+                <label for="instructions">AI Instructions:</label>
+                <textarea id="instructions" name="instructions" rows="3" placeholder="e.g., Find information about product features and pricing, or extract FAQ content"></textarea>
+                <div class="hint">Be specific about what information you want the AI to extract.</div>
             </div>
 
             <div class="form-group">
-                <label for="depth">Crawl Depth (for future use):</label>
-                <input type="number" id="depth" name="depth" min="0" value="0">
+                <label for="depth">Crawl Depth:</label>
+                <div class="range-container">
+                    <input type="range" id="depth" name="depth" min="0" max="3" value="0">
+                    <span id="depthValue">0</span>
+                </div>
+                <div class="hint">0 = single page, 1-3 = follow links to specified depth</div>
+            </div>
+            
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" id="follow_external" name="follow_external_links">
+                    Follow external links
+                </label>
+                <div class="hint">Enable to crawl links outside the original domain</div>
             </div>
 
-            <button type="submit" id="submitBtn">Start Scraping</button>
+            <div class="form-actions">
+                <button type="submit" id="submitBtn">Start Scraping</button>
+                <button type="button" id="resetBtn">Reset</button>
+            </div>
         </form>
 
-        <div id="loading" class="loading" style="display: none;">Processing...</div>
-
-        <h2>Results:</h2>
-        <div id="results">
-            <pre>Submit the form to see results here.</pre> <!-- Placeholder -->
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>AI is processing your request...</p>
         </div>
+
+        <div id="results-container" style="display: none;">
+            <div class="results-header">
+                <h2>Results:</h2>
+                <div class="download-options">
+                    <button id="downloadJson">Download JSON</button>
+                    <button id="downloadMarkdown">Download Markdown</button>
+                </div>
+            </div>
+
+            <div id="results" class="results-area">
+                <!-- Results will be displayed here -->
+            </div>
+        </div>
+        
+        <div id="ai-explanation" class="ai-explanation">
+            <h3>How It Works</h3>
+            <p>Crawler uses AI to understand your instructions and extract exactly the information you need:</p>
+            <ol>
+                <li><strong>Natural Language Instructions</strong> - Tell the AI what information you want in plain English</li>
+                <li><strong>Smart Content Filtering</strong> - AI identifies relevant content and ignores the rest</li>
+                <li><strong>Structured Data Extraction</strong> - Gets the data in a format ready for use in RAG systems</li>
+            </ol>
+            <p class="example-prompt">Example prompt: "We're building a chatbot for HR. Extract information about employee benefits, policies, and FAQ content."</p>
+        </div>
+        
+        <footer>
+            <p>Crawler - Intelligent Web Scraping Tool for RAG systems</p>
+        </footer>
     </div>
 
-    <script src="/static/script.js"></script> <!-- Link to JavaScript -->
+    <script src="/static/script.js"></script>
 </body>
 </html>

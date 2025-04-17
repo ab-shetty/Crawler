@@ -2,10 +2,16 @@
 
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 import os
 import sys
 from pathlib import Path
+from typing import Any, Dict, Optional
+import json
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # --- Adjust Python Path to Find Sibling 'crawler' Directory ---
 # Get the directory of the current file (api/main.py)
@@ -16,8 +22,7 @@ project_root = current_dir.parent
 sys.path.append(str(project_root))
 # --- End Path Adjustment ---
 
-from .schemas import CrawlRequest, CrawlResponse # Use relative import for schemas
-# Import your crawler client (adjust if your class name is different)
+# Import the crawler (without using schemas for testing)
 try:
     from crawler import SimpleCrawlerClient, CrawlerError
 except ImportError:
@@ -27,7 +32,7 @@ except ImportError:
     class SimpleCrawlerClient:
         def scrape_page(self, url: str, instructions: str | None = None) -> dict:
             return {"url": str(url), "error": "Crawler not found"}
-    class SimpleCrawlerError(Exception): pass
+    class CrawlerError(Exception): pass
 
 # --- FastAPI App Initialization ---
 app = FastAPI(
@@ -47,28 +52,129 @@ else:
 
 
 # --- API Endpoints ---
-@app.post("/api/scrape", response_model=CrawlResponse, tags=["Crawling"])
-async def scrape_website(request: CrawlRequest):
+@app.post("/api/scrape")
+async def scrape_website(request: Request):
     """
-    Endpoint to initiate a web crawl for a single page.
-    (Note: Currently uses the simple client for one page).
+    Endpoint to initiate a web crawl.
+    For testing, accepts any JSON body with URL and instructions.
     """
-    client = SimpleCrawlerClient() # Instantiate your simple client
+    # Parse the request body directly without schema validation
     try:
-        # In the simple version, 'depth' isn't used, but instructions are passed
-        # If you evolve the client, you'd pass request.depth here.
-        result_data = client.scrape_page(url=str(request.url), instructions=request.instructions)
-        # Wrap the single result in a list to match CrawlResponse structure
-        return CrawlResponse(status="success", data=[result_data])
+        body = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
+    
+    # Get required fields
+    if 'url' not in body:
+        raise HTTPException(status_code=400, detail="URL is required")
+    
+    url = body['url']
+    instructions = body.get('instructions', "Extract main content")
+    depth = body.get('depth', 0)
+    
+    # For testing, print the request details
+    print(f"Processing request: URL={url}, Instructions={instructions}, Depth={depth}")
+    
+    # Get OpenAI API key from environment or request
+    api_key = os.getenv("OPENAI_API_KEY")
+    
+    # Initialize the client with OpenAI API key if available
+    client = SimpleCrawlerClient(api_key=api_key)
+    
+    try:
+        # For depth=0, just scrape a single page
+        if depth == 0:
+            result_data = client.scrape_page(url=str(url), instructions=instructions)
+            
+            # Return a successful response with the scraped data
+            return {
+                "status": "success",
+                "data": [result_data]  # Wrap in list for compatibility
+            }
+        else:
+            # For depth > 0, use the multi-page crawler
+            from crawler import CrawlerClient
+            advanced_client = CrawlerClient(api_key=api_key)
+            
+            # Use advanced crawling for depth > 0
+            result_data = advanced_client.scrape(
+                url=str(url),
+                instructions=instructions,
+                depth=depth,
+                follow_external_links=body.get('follow_external_links', False),
+                max_pages=body.get('max_pages', 20)
+            )
+            
+            return {
+                "status": "success",
+                "data": result_data['pages']
+            }
 
-    except SimpleCrawlerError as e:
+    except CrawlerError as e:
         raise HTTPException(status_code=500, detail=f"Crawler error: {e}")
     except Exception as e:
         # Catch any other unexpected errors
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
+# --- Download endpoint to save results ---
+@app.post("/api/download")
+async def download_results(request: Request):
+    """
+    Endpoint to download crawling results in various formats.
+    """
+    try:
+        body = await request.json()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
+    
+    if 'data' not in body:
+        raise HTTPException(status_code=400, detail="Data is required")
+    
+    format = body.get('format', 'json')
+    
+    # Create temp directory if it doesn't exist
+    temp_dir = project_root / "temp"
+    temp_dir.mkdir(exist_ok=True)
+    
+    # Generate a filename
+    import time
+    timestamp = time.strftime("%Y%m%d-%H%M%S")
+    filename = f"crawler_results_{timestamp}.{format}"
+    filepath = temp_dir / filename
+    
+    # Write the data to the file
+    if format == 'json':
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(body['data'], f, indent=2)
+    elif format == 'markdown' or format == 'md':
+        from crawler import CrawlerClient
+        client = CrawlerClient()
+        
+        # Construct a properly formatted result for markdown export
+        result = {
+            "meta": {
+                "url": body.get('url', 'Unknown URL'),
+                "instructions": body.get('instructions', 'No instructions'),
+                "depth": body.get('depth', 0),
+                "pages_crawled": len(body['data']),
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+            },
+            "pages": body['data']
+        }
+        
+        client.export_to_markdown(result, str(filepath))
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {format}")
+    
+    # Return the file
+    return FileResponse(
+        path=filepath,
+        filename=filename,
+        media_type='application/octet-stream'
+    )
+
 # --- Root Endpoint to Serve Frontend ---
-@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/", response_class=HTMLResponse)
 async def read_root():
     """Serves the main index.html file."""
     index_path = static_dir / "index.html"
@@ -76,25 +182,37 @@ async def read_root():
         raise HTTPException(status_code=404, detail="index.html not found")
     return FileResponse(index_path)
 
-# --- Optional: Add Background Task Example (if needed later) ---
-# async def run_scrape_task(client: SimpleCrawlerClient, url: str, instructions: str):
-#     print(f"Background task started for {url}")
-#     # Replace with actual long-running crawl logic
-#     await asyncio.sleep(5) # Simulate work
-#     result = client.scrape_page(url=url, instructions=instructions)
-#     print(f"Background task finished for {url}. Result: {result.get('title', 'N/A')}")
-#     # Here you would typically store the result somewhere (DB, cache, file)
+# --- Health check endpoint ---
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "ok", "version": "0.1.0"}
 
-# @app.post("/api/scrape_background", status_code=202, tags=["Crawling"])
-# async def scrape_background(request: CrawlRequest, background_tasks: BackgroundTasks):
-#     """Endpoint to initiate scraping as a background task."""
-#     client = SimpleCrawlerClient()
-#     background_tasks.add_task(run_scrape_task, client, str(request.url), request.instructions)
-#     return {"message": "Scraping task accepted and running in the background."}
+# --- Environment check endpoint (for testing) ---
+@app.get("/api/environment")
+async def environment_check():
+    """
+    Returns information about the environment for debugging purposes.
+    In production, this would be restricted to admins or removed.
+    """
+    has_openai_key = bool(os.getenv("OPENAI_API_KEY"))
+    
+    return {
+        "has_openai_key": has_openai_key,
+        "python_version": sys.version,
+        "paths": {
+            "current_dir": str(current_dir),
+            "project_root": str(project_root),
+            "static_dir": str(static_dir),
+        }
+    }
 
 
 if __name__ == "__main__":
     import uvicorn
-    # Run directly for testing (uvicorn api.main:app --reload)
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
+    # Run directly for testing
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
+    debug = os.getenv("DEBUG", "True").lower() in ("true", "1", "t")
+    
+    uvicorn.run(app, host=host, port=port, reload=debug)

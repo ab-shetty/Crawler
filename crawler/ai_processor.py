@@ -74,7 +74,7 @@ class AiProcessor:
             
             # Call OpenAI API
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini-2024-07-18",
                 messages=[
                     {"role": "system", "content": "You are a content relevance analyzer."},
                     {"role": "user", "content": prompt}
@@ -310,7 +310,7 @@ class AiProcessor:
             
             # Call OpenAI API
             response = self.client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini-2024-07-18",
                 messages=[
                     {"role": "system", "content": "You are a search query optimization assistant."},
                     {"role": "user", "content": prompt}
