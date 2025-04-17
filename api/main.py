@@ -117,61 +117,91 @@ async def scrape_website(request: Request):
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 # --- Download endpoint to save results ---
-@app.post("/api/download")
-async def download_results(request: Request):
+@app.post("/api/scrape")
+async def scrape_website(request: Request, background_tasks: BackgroundTasks):
     """
-    Endpoint to download crawling results in various formats.
+    Endpoint to initiate a web crawl.
+    For testing, accepts any JSON body with URL and instructions.
     """
+    # Parse the request body directly without schema validation
     try:
         body = await request.json()
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid JSON: {str(e)}")
     
-    if 'data' not in body:
-        raise HTTPException(status_code=400, detail="Data is required")
+    # Get required fields
+    if 'url' not in body:
+        raise HTTPException(status_code=400, detail="URL is required")
     
-    format = body.get('format', 'json')
+    url = body['url']
+    instructions = body.get('instructions', "Extract main content")
+    depth = body.get('depth', 0)
     
-    # Create temp directory if it doesn't exist
-    temp_dir = project_root / "temp"
-    temp_dir.mkdir(exist_ok=True)
+    # For testing, print the request details
+    print(f"Processing request: URL={url}, Instructions={instructions}, Depth={depth}")
     
-    # Generate a filename
-    import time
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    filename = f"crawler_results_{timestamp}.{format}"
-    filepath = temp_dir / filename
+    # Get OpenAI API key from environment or request
+    api_key = os.getenv("OPENAI_API_KEY")
     
-    # Write the data to the file
-    if format == 'json':
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(body['data'], f, indent=2)
-    elif format == 'markdown' or format == 'md':
-        from crawler import CrawlerClient
-        client = CrawlerClient()
-        
-        # Construct a properly formatted result for markdown export
-        result = {
-            "meta": {
-                "url": body.get('url', 'Unknown URL'),
-                "instructions": body.get('instructions', 'No instructions'),
-                "depth": body.get('depth', 0),
-                "pages_crawled": len(body['data']),
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-            },
-            "pages": body['data']
-        }
-        
-        client.export_to_markdown(result, str(filepath))
-    else:
-        raise HTTPException(status_code=400, detail=f"Unsupported format: {format}")
-    
-    # Return the file
-    return FileResponse(
-        path=filepath,
-        filename=filename,
-        media_type='application/octet-stream'
-    )
+    try:
+        # Use the appropriate client based on depth
+        if depth == 0:
+            # For single page, use the enhanced crawler directly
+            from crawler.enhanced_crawler import EnhancedCrawlerClient
+            
+            # Create the crawler
+            crawler = EnhancedCrawlerClient(api_key=api_key)
+            
+            # Initialize the crawler
+            await crawler.initialize_crawler()
+            
+            # Run the scrape in a separate task to avoid blocking
+            result = await crawler.scrape_page(
+                url=url,
+                instructions=instructions
+            )
+            
+            # Schedule the crawler to be closed after the response is sent
+            background_tasks.add_task(crawler.close)
+            
+            # Return a successful response with the scraped data
+            return {
+                "status": "success",
+                "data": [result]  # Wrap in list for compatibility
+            }
+        else:
+            # For multi-page crawling
+            from crawler.enhanced_crawler import EnhancedCrawlerClient
+            
+            # Create the crawler
+            crawler = EnhancedCrawlerClient(api_key=api_key)
+            
+            # Initialize the crawler
+            await crawler.initialize_crawler()
+            
+            # Run the multi-page crawl
+            result = await crawler.scrape(
+                url=url,
+                instructions=instructions,
+                depth=depth,
+                follow_external_links=body.get('follow_external_links', False),
+                max_pages=body.get('max_pages', 20)
+            )
+            
+            # Schedule the crawler to be closed after the response is sent
+            background_tasks.add_task(crawler.close)
+            
+            return {
+                "status": "success",
+                "data": result['pages']
+            }
+
+    except Exception as e:
+        # Log the error
+        import traceback
+        traceback.print_exc()
+        # Catch any other unexpected errors
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
 
 # --- Root Endpoint to Serve Frontend ---
 @app.get("/", response_class=HTMLResponse)

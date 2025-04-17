@@ -2,6 +2,7 @@
 
 import logging
 from urllib.parse import urljoin, urlparse
+from typing import List
 
 from .config import LOGGING_LEVEL, LOG_FORMAT
 
@@ -41,4 +42,23 @@ def clean_text(text: str) -> str:
     # Add more cleaning rules as needed
     return text
 
-# Add more utility functions as needed (e.g., data formatters, file handlers)
+def chunk_text(text: str, chunk_size: int = 5000) -> List[str]:
+    """
+    Split text into chunks, respecting code blocks and paragraphs.
+    
+    Args:
+        text: The text to split into chunks
+        chunk_size: Maximum size of each chunk in characters
+        
+    Returns:
+        List of text chunks
+    """
+    chunks = []
+    start = 0
+    text_length = len(text)
+
+    while start < text_length:
+        # Calculate end position
+        end = start + chunk_size
+
+        # If we're
