@@ -1,5 +1,7 @@
 # Crawler - AI Web Scraping Tool for RAG Systems
 
+![Web Interface Screenshot](images/crawler.png)
+
 Crawler is an intelligent web scraping tool that uses AI to extract relevant content from websites based on natural language instructions. It's designed specifically for creating high-quality documents for Retrieval Augmented Generation (RAG) systems.
 
 ## Features
@@ -14,7 +16,15 @@ Crawler is an intelligent web scraping tool that uses AI to extract relevant con
 ## Installation
 
 ```bash
-pip install crawler
+# Clone the repository
+git clone https://github.com/yourusername/crawler.git
+cd crawler
+
+# Install dependencies
+python install_dependencies.py
+
+# Set up your environment variables (create a .env file)
+echo "OPENAI_API_KEY=your_api_key_here" > .env
 ```
 
 ## Basic Usage
@@ -24,7 +34,7 @@ import os
 from crawler import CrawlerClient
 
 # Get API key from environment variable
-key = os.getenv('CRAWLER_API_KEY')
+key = os.getenv('OPENAI_API_KEY')
 
 # Initialize the client
 client = CrawlerClient(api_key=key)
@@ -43,6 +53,49 @@ print(f"Document Type: {rag_documents[0]['chunk_type']}")
 print(f"Content: {rag_documents[0]['content'][:100]}...")
 print(f"Metadata: {rag_documents[0]['metadata']}")
 ```
+
+## Web Interface
+
+Crawler includes a user-friendly web interface that allows you to:
+- Enter a website URL and natural language instructions
+- Configure crawl depth and other parameters
+- Run the crawler and view results in real-time
+- Download extracted data in JSON or Markdown format
+
+### Running the Web Interface
+
+```bash
+# From the project root directory
+cd crawler
+python -m api.main
+
+# Or for development mode with auto-reload
+DEBUG=True python -m api.main
+```
+
+By default, the web interface will be available at http://localhost:8000
+
+![Web Interface Screenshot](images/crawler.png)
+
+![Web Interface Results](images/crawler_results.png)
+
+## How It Works
+
+Crawler operates through several key components working together:
+
+1. **EnhancedCrawlerClient**: The main entry point that handles the crawling process
+2. **AiProcessor**: Uses OpenAI models to extract relevant content based on instructions
+3. **AsyncWebCrawler**: Manages browser automation for handling JavaScript-rendered content
+4. **Web Interface**: Provides a user-friendly way to interact with the crawler
+
+The process flow is:
+
+1. User provides a URL and natural language instructions
+2. Crawler visits the specified URL and extracts content
+3. AI analyzes the content for relevance to the instructions
+4. If depth > 0, crawler follows links and repeats the process
+5. Content is processed into chunks optimized for RAG systems
+6. Results are returned in a structured format
 
 ## Advanced Usage
 
@@ -98,21 +151,66 @@ Each document includes:
 - `content`: The actual text content
 - `metadata`: Source URL, title, relevance score, and more
 
-You can easily load these into vector databases or RAG pipelines:
+### Integrating with Vector Databases
+
+Here's how to integrate with popular vector databases:
+
+#### Chroma
 
 ```python
-# Example integration with a vector database (pseudocode)
-for doc in rag_documents:
-    vector_db.add_document(
-        text=doc['content'],
-        metadata=doc['metadata']
+import chromadb
+from crawler import CrawlerClient
+
+# Initialize clients
+crawler_client = CrawlerClient()
+chroma_client = chromadb.Client()
+collection = chroma_client.create_collection("my_rag_collection")
+
+# Crawl website
+documents = crawler_client.scrape("https://example.com", "Extract product information")
+rag_documents = crawler_client.create_rag_documents(documents)
+
+# Add documents to Chroma
+for i, doc in enumerate(rag_documents):
+    collection.add(
+        ids=[f"doc_{i}"],
+        documents=[doc['content']],
+        metadatas=[doc['metadata']]
     )
+```
+
+#### LangChain
+
+```python
+from langchain.vectorstores import FAISS
+from langchain.embeddings import OpenAIEmbeddings
+from crawler import CrawlerClient
+
+# Initialize clients
+crawler_client = CrawlerClient()
+embeddings = OpenAIEmbeddings()
+
+# Crawl website
+documents = crawler_client.scrape("https://example.com", "Extract product information")
+rag_documents = crawler_client.create_rag_documents(documents)
+
+# Prepare documents for LangChain
+texts = [doc['content'] for doc in rag_documents]
+metadatas = [doc['metadata'] for doc in rag_documents]
+
+# Create vector store
+vector_store = FAISS.from_texts(texts, embeddings, metadatas=metadatas)
+
+# Search
+query = "What are the product features?"
+results = vector_store.similarity_search(query)
 ```
 
 ## Requirements
 
 - Python 3.9+
 - OpenAI API key (for AI content processing)
+- Playwright (for browser automation)
 
 ## License
 

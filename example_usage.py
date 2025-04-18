@@ -1,8 +1,5 @@
 # Example usage as specified in the assignment
 
-# The example provided for this kind of usage did not 
-# make any mention of crawl depth, therefore the CrawlerClient 
-# class does not make use of a direct crawl depth variable. 
 
 import os
 import sys
