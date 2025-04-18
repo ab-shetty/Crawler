@@ -1,15 +1,12 @@
-# api/main.py
-
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse
 import os
 import sys
 import json
-import asyncio
 from pathlib import Path
-from typing import Any, Dict, Optional
 from dotenv import load_dotenv
+from typing import Any, Dict, Optional
 
 # Load environment variables
 load_dotenv()
@@ -19,7 +16,6 @@ current_dir = Path(__file__).parent
 project_root = current_dir.parent
 sys.path.append(str(project_root))
 
-# Import EnhancedCrawlerClient directly
 from crawler.enhanced_crawler import EnhancedCrawlerClient
 
 # --- FastAPI App Setup ---
@@ -103,8 +99,7 @@ async def download_results(request: Request):
     filename = f"crawler_results_{timestamp}.{format}"
     filepath = temp_dir / filename
 
-    from crawler.enhanced_crawler import CrawlerClient  # Only for export
-    client = CrawlerClient()
+    crawler = app.state.crawler
 
     if format == "json":
         with open(filepath, "w", encoding="utf-8") as f:
@@ -120,13 +115,13 @@ async def download_results(request: Request):
             },
             "pages": body["data"]
         }
-        client.export_to_markdown(result, str(filepath))
+        crawler.export_to_markdown(result, str(filepath))
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported format: {format}")
 
     return FileResponse(path=filepath, filename=filename, media_type="application/octet-stream")
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def read_root():
     index_path = static_dir / "index.html"
     if not index_path.exists():
