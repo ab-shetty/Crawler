@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const resetBtn = document.getElementById('resetBtn');
     const depthRange = document.getElementById('depth');
     const depthValue = document.getElementById('depthValue');
+    const maxPagesRange = document.getElementById('max_pages');
+    const maxPagesValue = document.getElementById('maxPagesValue');
     const downloadJsonBtn = document.getElementById('downloadJson');
     const downloadMarkdownBtn = document.getElementById('downloadMarkdown');
     
@@ -22,10 +24,16 @@ document.addEventListener('DOMContentLoaded', function() {
         depthValue.textContent = this.value;
     });
     
+    // Update max pages value display when slider changes
+    maxPagesRange.addEventListener('input', function() {
+        maxPagesValue.textContent = this.value;
+    });
+    
     // Reset form
     resetBtn.addEventListener('click', function() {
         form.reset();
         depthValue.textContent = '0';
+        maxPagesValue.textContent = '20';
         resultsContainer.style.display = 'none';
         resultsDiv.innerHTML = '';
         currentResults = null;
@@ -39,6 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const url = document.getElementById('url').value;
         const instructions = document.getElementById('instructions').value;
         const depth = parseInt(depthRange.value, 10);
+        const maxPages = parseInt(maxPagesRange.value, 10);
         const followExternal = document.getElementById('follow_external').checked;
 
         if (!url) {
@@ -57,14 +66,15 @@ document.addEventListener('DOMContentLoaded', function() {
             instructions: instructions,
             depth: depth,
             follow_external_links: followExternal,
-            max_pages: 20 // Default limit
+            max_pages: maxPages
         };
         
         // Save current request for download options
         currentRequest = {
             url: url,
             instructions: instructions,
-            depth: depth
+            depth: depth,
+            max_pages: maxPages
         };
 
         try {
@@ -139,7 +149,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 format: format,
                 url: currentRequest?.url || 'unknown',
                 instructions: currentRequest?.instructions || 'No instructions',
-                depth: currentRequest?.depth || 0
+                depth: currentRequest?.depth || 0,
+                max_pages: currentRequest?.max_pages || 20
             };
             
             const response = await fetch('/api/download', {
@@ -207,6 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
         summary.className = 'results-summary';
         summary.innerHTML = `
             <p><strong>Pages Crawled:</strong> ${result.data.length}</p>
+            <p><strong>Max Pages Setting:</strong> ${currentRequest.max_pages || 20}</p>
         `;
         resultsDiv.appendChild(summary);
         

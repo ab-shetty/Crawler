@@ -1,9 +1,8 @@
 # Example usage as specified in the assignment
 
 # The example provided for this kind of usage did not 
-# make any mention of crawl depth, therefore this script
-# and the CrawlerClient class do not make use of a direct
-# crawl depth variable. 
+# make any mention of crawl depth, therefore the CrawlerClient 
+# class does not make use of a direct crawl depth variable. 
 
 import os
 import sys
@@ -35,12 +34,6 @@ def main():
         # Handle case where a specific URL fails
         if any('error' in page for page in documents.get('pages', [])):
             print("Warning: Some pages had errors during crawling.")
-            
-            # Try a fallback URL if the original one failed completely
-            if all('error' in page for page in documents.get('pages', [])):
-                print(f"All pages failed. Trying fallback URL...")
-                fallback_url = "https://example.com"
-                documents = client.scrape(fallback_url, instructions, depth=0, max_pages=1)
         
         # Print statistics
         print(f"Scraped {len(documents['pages'])} pages")
@@ -63,16 +56,6 @@ def main():
     
     except Exception as e:
         print(f"Error during crawling: {e}")
-        print("Trying fallback URL with minimal settings...")
-        try:
-            documents = client.scrape("https://example.com", instructions, depth=0, max_pages=1)
-            print(f"Fallback crawl succeeded with {len(documents['pages'])} pages")
-            
-            # Process the documents for RAG
-            rag_documents = client.create_rag_documents(documents)
-            print(f"Created {len(rag_documents)} RAG documents")
-        except Exception as e2:
-            print(f"Fallback also failed: {e2}")
 
 
 if __name__ == "__main__":

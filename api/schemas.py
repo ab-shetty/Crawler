@@ -22,8 +22,6 @@ class CrawlResponseData(BaseModel):
     title: Optional[str] = None
     paragraphs: Optional[List[str]] = None
     error: Optional[str] = None
-    # Add other fields extracted by your crawler as needed
-    # e.g., relevant_sections: Optional[List[str]] = None
 
 class CrawlResponse(BaseModel):
     """Defines the overall structure of the API response."""
@@ -32,6 +30,4 @@ class CrawlResponse(BaseModel):
     data: Optional[List[Dict[str, Any]]] = Field(
          None, description="List of results from crawled pages (flexible dict for now)."
     )
-    # Using List[Dict[str, Any]] for flexibility as your base SimpleCrawlerClient returns dicts.
-    # You could refine this to use List[CrawlResponseData] if your client always returns that structure.
 

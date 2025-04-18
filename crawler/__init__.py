@@ -5,7 +5,7 @@ from .enhanced_crawler import EnhancedCrawlerClient as CrawlerClient
 from .exceptions import CrawlerError, CrawlingError, ContentProcessingError, ConfigurationError, RateLimitError
 
 # Version information
-__version__ = "0.2.0"
+__version__ = "0.1.0"
 
 # Export these classes/functions for easier imports
 __all__ = [
