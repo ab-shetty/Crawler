@@ -29,7 +29,14 @@ class EnhancedCrawlerClient:
         self.browser_config = BrowserConfig(
             headless=True,
             verbose=False,
-            extra_args=["--disable-gpu", "--disable-dev-shm-usage", "--no-sandbox"],
+            extra_args=[
+                "--disable-gpu", 
+                "--disable-dev-shm-usage", 
+                "--no-sandbox",
+                "--disable-http2",  # Disable HTTP/2 to avoid protocol errors
+                "--disable-features=NetworkService",  # Use a more stable network stack
+                "--disable-web-security"  # Disable CORS and other security features that might block crawling
+            ],
             user_agent=user_agent
         )
 
@@ -51,7 +58,10 @@ class EnhancedCrawlerClient:
 
     async def close(self):
         if self._crawler_initialized and self._crawler:
-            await self._crawler.close()
+            try:
+                await self._crawler.close()
+            except Exception as e:
+                self.logger.warning(f"Error while closing crawler: {e}")
             self._crawler_initialized = False
             self.logger.info("Crawler closed")
 
@@ -151,6 +161,27 @@ class EnhancedCrawlerClient:
             try:
                 await self._ensure_crawler_initialized()
                 session_id = f"session_{int(time.time())}"
+                
+                # Try with different browser configurations if needed
+                if retry_count > 0:
+                    # Try with different browser settings on retry
+                    modified_config = self.crawl_config
+                    if "disable-http2" not in str(self.browser_config.extra_args):
+                        self.logger.info(f"Retry {retry_count} with HTTP/1.1 forced")
+                        # Force HTTP/1.1 on retry
+                        self._crawler = AsyncWebCrawler(config=BrowserConfig(
+                            headless=True,
+                            verbose=False,
+                            extra_args=[
+                                "--disable-gpu", 
+                                "--disable-dev-shm-usage", 
+                                "--no-sandbox",
+                                "--disable-http2",
+                            ],
+                            user_agent=self.browser_config.user_agent
+                        ))
+                        await self._crawler.start()
+                
                 result = await self._crawler.arun(url=url, config=self.crawl_config, session_id=session_id)
 
                 if not result.success:
@@ -219,7 +250,7 @@ class EnhancedCrawlerClient:
                 return {"url": url, "error": f"Error processing page: {str(e)}"}
 
     async def scrape_async(self, url: str, instructions: str = None, depth: int = 1,
-                           follow_external_links: bool = False, max_pages: int = 20) -> Dict[str, Any]:
+                           follow_external_links: bool = False, max_pages: int = 100) -> Dict[str, Any]:
         """
         Async version of the scrape method.
         """
@@ -273,7 +304,7 @@ class EnhancedCrawlerClient:
         return result
     
     def scrape(self, url: str, instructions: str = None, depth: int = 1, 
-               follow_external_links: bool = False, max_pages: int = 20) -> Dict[str, Any]:
+               follow_external_links: bool = False, max_pages: int = 100) -> Dict[str, Any]:
         """
         Synchronous interface for scraping a website.
         

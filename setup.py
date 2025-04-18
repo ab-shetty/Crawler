@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="crawler",
-    version="0.2.0",
+    version="0.1.0",
     packages=find_packages(),
     install_requires=[
         "fastapi>=0.95.0",
@@ -20,7 +20,7 @@ setup(
     keywords="web crawler, ai, rag",
     url="https://github.com/ab-shetty/Crawler",
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: Alpha",
         "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.9",
