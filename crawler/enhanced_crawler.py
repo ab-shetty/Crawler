@@ -327,7 +327,6 @@ class EnhancedCrawlerClient:
         
         # Run the async method in the event loop
         if loop.is_running():
-            # If we're already in an event loop (e.g., inside FastAPI)
             return asyncio.create_task(
                 self.scrape_async(url, instructions, depth, follow_external_links, max_pages)
             )
