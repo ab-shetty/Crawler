@@ -132,7 +132,7 @@ class EnhancedCrawlerClient:
             # Use AI to assess relevance if instructions provided
             if instructions:
                 # Use first part of markdown content for relevance check
-                content_sample = markdown_content[:3000] if markdown_content else ""
+                content_sample = markdown_content[:5000] if markdown_content else ""
                 if not content_sample:
                     paragraphs = self._extract_paragraphs(soup)
                     content_sample = "\n".join(paragraphs[:10])
@@ -331,7 +331,6 @@ class EnhancedCrawlerClient:
                 "depth": depth,
                 "follow_external_links": follow_external_links,
                 "pages_crawled": len(results),
-                "time_taken": end_time - start_time,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             },
             "pages": results
@@ -373,7 +372,6 @@ class EnhancedCrawlerClient:
             f.write(f"- **Instructions:** {data['meta']['instructions']}\n")
             f.write(f"- **Depth:** {data['meta']['depth']}\n")
             f.write(f"- **Pages Crawled:** {data['meta']['pages_crawled']}\n")
-            f.write(f"- **Time Taken:** {data['meta']['time_taken']:.2f} seconds\n")
             f.write(f"- **Timestamp:** {data['meta']['timestamp']}\n\n")
             
             # Write page data
@@ -406,7 +404,7 @@ class EnhancedCrawlerClient:
                     # Include markdown content if available
                     if 'markdown' in page and page['markdown']:
                         f.write("### Content\n\n")
-                        f.write(page['markdown'][:1000] + "...\n\n")
+                        f.write(page['markdown'] + "...\n\n")
                     
                     # Write links
                     if 'links' in page and page['links']:

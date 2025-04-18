@@ -61,7 +61,6 @@ else:
 async def scrape_website(request: Request, background_tasks: BackgroundTasks):
     """
     Endpoint to initiate a web crawl.
-    Accepts JSON body with URL and instructions.
     """
     # Parse the request body
     try:
@@ -77,37 +76,40 @@ async def scrape_website(request: Request, background_tasks: BackgroundTasks):
     instructions = body.get('instructions', "Extract main content")
     depth = body.get('depth', 0)
     
-    # For tracking, print the request details
     print(f"Processing request: URL={url}, Instructions={instructions}, Depth={depth}")
     
     # Get OpenAI API key from environment
     api_key = os.getenv("OPENAI_API_KEY")
     
     try:
-        # For depth=0, just scrape a single page
+        # Use the appropriate client based on depth
         if depth == 0:
-            # Initialize the client with OpenAI API key if available
+            # For single page, use SimpleCrawlerClient
+            print("Instantiating client...")
+
             client = SimpleCrawlerClient(api_key=api_key)
-            
-            # Scrape the page
-            result_data = client.scrape_page(url=str(url), instructions=instructions)
-            
-            # Return a successful response with the scraped data
+            print("Starting scrape...")
+
+            result_data = await asyncio.to_thread(client.scrape_page, str(url), instructions)
+            print("Scrape finished...")
+
+            # Return a successful response
             return {
                 "status": "success",
                 "data": [result_data]  # Wrap in list for compatibility
             }
         else:
-            # For depth > 0, use the multi-page crawler
-            advanced_client = CrawlerClient(api_key=api_key)
+            # For depth > 0, use the CrawlerClient
+            client = CrawlerClient(api_key=api_key)
             
             # Use advanced crawling for depth > 0
-            result_data = advanced_client.scrape(
-                url=str(url),
-                instructions=instructions,
-                depth=depth,
-                follow_external_links=body.get('follow_external_links', False),
-                max_pages=body.get('max_pages', 20)
+            result_data = await asyncio.to_thread(
+                client.scrape,
+                str(url),
+                instructions,
+                depth,
+                body.get('follow_external_links', False),
+                body.get('max_pages', 20)
             )
             
             return {
@@ -115,14 +117,16 @@ async def scrape_website(request: Request, background_tasks: BackgroundTasks):
                 "data": result_data['pages']
             }
 
-    except CrawlerError as e:
-        raise HTTPException(status_code=500, detail=f"Crawler error: {e}")
     except Exception as e:
-        # Log the full error details
+        # Log the full error with traceback
         import traceback
         traceback.print_exc()
-        # Return a concise error message to the client
+        # Return the error
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+    finally:
+        # Force garbage collection to clean up any remaining resources
+        import gc
+        gc.collect()
 
 # --- Download endpoint to save results ---
 @app.post("/api/download")

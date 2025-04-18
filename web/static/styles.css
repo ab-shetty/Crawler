@@ -1,60 +1,341 @@
-/* Add these CSS rules to your styles.css file */
+/* web/static/styles.css */
+:root {
+    --primary-color: #4361ee;
+    --primary-hover: #3a56d4;
+    --secondary-color: #3a0ca3;
+    --success-color: #2ecc71;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+    --light-bg: #f8f9fa;
+    --dark-bg: #343a40;
+    --text-color: #333;
+    --light-text: #6c757d;
+    --border-color: #dee2e6;
+    --box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
 
-/* Improved range slider styling */
-input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    background-color: var(--light-bg);
+    color: var(--text-color);
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+header h1 {
+    color: var(--primary-color);
+    margin-bottom: 5px;
+}
+
+.subtitle {
+    color: var(--light-text);
+    font-size: 1.1rem;
+    margin-top: 0;
+}
+
+/* Form styling */
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+input[type="url"],
+input[type="number"],
+textarea {
     width: 100%;
-    height: 8px;
-    background: var(--border-color, #dee2e6);
-    border-radius: 5px;
-    outline: none;
-    opacity: 0.7;
-    -webkit-transition: .2s;
-    transition: opacity .2s;
-    cursor: pointer;
-    margin: 10px 0;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box;
 }
 
-input[type="range"]:hover {
-    opacity: 1;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    background: var(--primary-color, #4361ee);
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-}
-
-input[type="range"]::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    background: var(--primary-color, #4361ee);
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
+textarea {
+    resize: vertical;
+    min-height: 80px;
 }
 
 .range-container {
     display: flex;
     align-items: center;
-    gap: 15px;
-    margin: 10px 0;
-    position: relative;
+    gap: 10px;
+}
+
+input[type="range"] {
+    flex-grow: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: var(--border-color);
+    border-radius: 3px;
+    outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    cursor: pointer;
 }
 
 #depthValue {
     font-weight: bold;
-    min-width: 25px;
+    width: 25px;
     text-align: center;
-    background: var(--primary-color, #4361ee);
-    color: white;
-    padding: 2px 8px;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.hint {
+    color: var(--light-text);
+    font-size: 0.85rem;
+    margin-top: 5px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+button {
+    padding: 10px 15px;
+    border: none;
     border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+button[type="submit"], button#downloadJson, button#downloadMarkdown {
+    background-color: var(--primary-color);
+    color: white;
+    font-weight: 500;
+}
+
+button[type="submit"]:hover, button#downloadJson:hover, button#downloadMarkdown:hover {
+    background-color: var(--primary-hover);
+}
+
+button[type="button"] {
+    background-color: #e9ecef;
+    color: var(--text-color);
+}
+
+button[type="button"]:hover {
+    background-color: #dee2e6;
+}
+
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.spinner {
     display: inline-block;
+    width: 30px;
+    height: 30px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+
+.spinner-sm {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    border-top-color: white;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Loading indicator */
+.loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 30px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.loading p {
+    margin-top: 15px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+/* Results area styling */
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.download-options {
+    display: flex;
+    gap: 10px;
+}
+
+.results-area {
+    background-color: white;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 30px;
+    box-shadow: var(--box-shadow);
+}
+
+.results-summary {
+    background-color: #f8f9fa;
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.page-result {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.page-result:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.page-header {
+    margin-bottom: 10px;
+}
+
+.page-header h3 {
+    margin: 0;
+    color: var(--primary-color);
+}
+
+.page-url {
+    font-size: 0.9rem;
+    color: var(--light-text);
+    word-break: break-all;
+}
+
+.page-content {
+    margin-bottom: 15px;
+}
+
+.ai-summary {
+    background-color: #e6f7ff;
+    padding: 12px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.ai-summary h4 {
+    margin-top: 0;
+    margin-bottom: 8px;
+    color: #0077cc;
+}
+
+.ai-points {
+    padding-left: 20px;
+    margin-top: 0;
+}
+
+.ai-data {
+    display: grid;
+    grid-template-columns: 30% 70%;
+    gap: 8px;
+    margin: 0;
+}
+
+.relevance-info {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.relevance-score {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 5px;
+}
+
+.score-bar {
+    flex-grow: 1;
+    height: 10px;
+    background-color: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.score-fill {
+    height: 100%;
+    background-color: var(--primary-color);
+}
+
+.score-value {
+    font-weight: 600;
+    width: 100px;
+}
+
+.relevance-reason {
+    color: var(--light-text);
+    font-size: 0.9rem;
+}
+
+.content-paragraphs {
+    max-height: 300px;
+    overflow-y: auto;
+    padding-right: 10px;
 }

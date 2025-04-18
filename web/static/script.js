@@ -1,164 +1,134 @@
 // web/static/script.js
 
 document.addEventListener('DOMContentLoaded', function() {
-    // DOM elements - Define these at the top to ensure they exist
+    // DOM elements
     const form = document.getElementById('crawlForm');
     const resultsContainer = document.getElementById('results-container');
     const resultsDiv = document.getElementById('results');
     const loadingDiv = document.getElementById('loading');
     const submitBtn = document.getElementById('submitBtn');
     const resetBtn = document.getElementById('resetBtn');
-    const downloadJsonBtn = document.getElementById('downloadJson');
-    const downloadMarkdownBtn = document.getElementById('downloadMarkdown');
-    
-    // Depth slider elements - Get fresh references
     const depthRange = document.getElementById('depth');
     const depthValue = document.getElementById('depthValue');
-    
-    // Debug log to check if elements are found
-    console.log("Depth slider elements:", { 
-        depthRange: depthRange, 
-        depthValue: depthValue 
-    });
+    const downloadJsonBtn = document.getElementById('downloadJson');
+    const downloadMarkdownBtn = document.getElementById('downloadMarkdown');
     
     // Store crawl results for download
     let currentResults = null;
     let currentRequest = null;
     
-    // Explicitly set the initial value
-    if (depthRange && depthValue) {
-        depthValue.textContent = depthRange.value;
-        
-        // Update depth value display when slider changes
-        depthRange.addEventListener('input', function() {
-            console.log("Slider changed to:", this.value);
-            depthValue.textContent = this.value;
-        });
-        
-        // Also listen for change event (for older browsers)
-        depthRange.addEventListener('change', function() {
-            console.log("Slider changed (change event) to:", this.value);
-            depthValue.textContent = this.value;
-        });
-    } else {
-        console.error("Depth slider elements not found!");
-    }
+    // Update depth value display when slider changes
+    depthRange.addEventListener('input', function() {
+        depthValue.textContent = this.value;
+    });
     
     // Reset form
-    if (resetBtn) {
-        resetBtn.addEventListener('click', function() {
-            form.reset();
-            if (depthValue) depthValue.textContent = '0';
-            if (resultsContainer) resultsContainer.style.display = 'none';
-            if (resultsDiv) resultsDiv.innerHTML = '';
-            currentResults = null;
-            currentRequest = null;
-        });
-    }
+    resetBtn.addEventListener('click', function() {
+        form.reset();
+        depthValue.textContent = '0';
+        resultsContainer.style.display = 'none';
+        resultsDiv.innerHTML = '';
+        currentResults = null;
+        currentRequest = null;
+    });
     
     // Handle form submission
-    if (form) {
-        form.addEventListener('submit', async (event) => {
-            event.preventDefault(); // Prevent default HTML form submission
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault(); // Prevent default HTML form submission
 
-            const url = document.getElementById('url').value;
-            const instructions = document.getElementById('instructions').value;
-            const depth = parseInt(depthRange.value, 10);
-            const followExternal = document.getElementById('follow_external').checked;
+        const url = document.getElementById('url').value;
+        const instructions = document.getElementById('instructions').value;
+        const depth = parseInt(depthRange.value, 10);
+        const followExternal = document.getElementById('follow_external').checked;
 
-            if (!url) {
-                showError("URL is required");
-                return;
-            }
+        if (!url) {
+            showError("URL is required");
+            return;
+        }
 
-            // Show loading indicator and disable button
-            loadingDiv.style.display = 'flex';
-            resultsContainer.style.display = 'none';
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-sm"></span> Processing...';
+        // Show loading indicator and disable button
+        loadingDiv.style.display = 'flex';
+        resultsContainer.style.display = 'none';
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-sm"></span> Processing...';
 
-            const requestBody = {
-                url: url,
-                instructions: instructions,
-                depth: depth,
-                follow_external_links: followExternal,
-                max_pages: 20 // Default limit
-            };
-            
-            // Save current request for download options
-            currentRequest = {
-                url: url,
-                instructions: instructions,
-                depth: depth
-            };
+        const requestBody = {
+            url: url,
+            instructions: instructions,
+            depth: depth,
+            follow_external_links: followExternal,
+            max_pages: 20 // Default limit
+        };
+        
+        // Save current request for download options
+        currentRequest = {
+            url: url,
+            instructions: instructions,
+            depth: depth
+        };
 
-            try {
-                const response = await fetch('/api/scrape', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
-                });
+        try {
+            const response = await fetch('/api/scrape', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            });
 
-                // Hide loading, restore button
-                loadingDiv.style.display = 'none';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Start Scraping';
+            // Hide loading, restore button
+            loadingDiv.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Start Scraping';
 
-                const result = await response.json();
+            const result = await response.json();
 
-                if (!response.ok) {
-                    const errorMsg = result.detail || `HTTP error! Status: ${response.status}`;
-                    showError(errorMsg);
-                    console.error('API Error:', result);
-                } else {
-                    // Save results for download
-                    currentResults = result.data;
-                    
-                    // Display successful results
-                    displayResults(result);
-                    
-                    // Show download options
-                    resultsContainer.style.display = 'block';
-                }
-
-            } catch (error) {
-                // Handle network errors
-                loadingDiv.style.display = 'none';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Start Scraping';
+            if (!response.ok) {
+                const errorMsg = result.detail || `HTTP error! Status: ${response.status}`;
+                showError(errorMsg);
+                console.error('API Error:', result);
+            } else {
+                // Save results for download
+                currentResults = result.data;
                 
-                showError(`Network or script error: ${error.message}`);
-                console.error('Fetch Error:', error);
+                // Display successful results
+                displayResults(result);
+                
+                // Show download options
+                resultsContainer.style.display = 'block';
             }
-        });
-    }
+
+        } catch (error) {
+            // Handle network errors
+            loadingDiv.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Start Scraping';
+            
+            showError(`Network or script error: ${error.message}`);
+            console.error('Fetch Error:', error);
+        }
+    });
     
     // Handle JSON download
-    if (downloadJsonBtn) {
-        downloadJsonBtn.addEventListener('click', function() {
-            if (!currentResults) {
-                showError("No results to download");
-                return;
-            }
-            
-            downloadResults('json');
-        });
-    }
+    downloadJsonBtn.addEventListener('click', function() {
+        if (!currentResults) {
+            showError("No results to download");
+            return;
+        }
+        
+        downloadResults('json');
+    });
     
     // Handle Markdown download
-    if (downloadMarkdownBtn) {
-        downloadMarkdownBtn.addEventListener('click', function() {
-            if (!currentResults) {
-                showError("No results to download");
-                return;
-            }
-            
-            downloadResults('markdown');
-        });
-    }
+    downloadMarkdownBtn.addEventListener('click', function() {
+        if (!currentResults) {
+            showError("No results to download");
+            return;
+        }
+        
+        downloadResults('markdown');
+    });
     
     // Download results function
     async function downloadResults(format) {
