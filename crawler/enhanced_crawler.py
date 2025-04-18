@@ -119,6 +119,7 @@ class EnhancedCrawlerClient:
             # Extract content from the crawl result
             html_content = result.html
             markdown_content = result.markdown.raw_markdown if result.markdown else ""
+            print (markdown_content)
             
             # Parse HTML for basic data extraction
             soup = BeautifulSoup(html_content, 'html.parser')
@@ -418,67 +419,67 @@ class EnhancedCrawlerClient:
         self.logger.info(f"Data exported to {filepath}")
 
 
-# Sync wrapper for compatibility with existing code
-class SimpleCrawlerClient:
-    """
-    A synchronous wrapper around the EnhancedCrawlerClient for backward compatibility.
-    """
+# # Sync wrapper for compatibility with existing code
+# class SimpleCrawlerClient:
+#     """
+#     A synchronous wrapper around the EnhancedCrawlerClient for backward compatibility.
+#     """
     
-    def __init__(self, api_key: Optional[str] = None, user_agent: str = "Crawler/1.0"):
-        """Initialize the simple crawler client."""
-        self.enhanced_client = EnhancedCrawlerClient(api_key=api_key, user_agent=user_agent)
-        self.logger = setup_logger("SimpleCrawlerClient")
+#     def __init__(self, api_key: Optional[str] = None, user_agent: str = "Crawler/1.0"):
+#         """Initialize the simple crawler client."""
+#         self.enhanced_client = EnhancedCrawlerClient(api_key=api_key, user_agent=user_agent)
+#         self.logger = setup_logger("SimpleCrawlerClient")
     
-    def scrape_page(self, url: str, instructions: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Synchronous wrapper for scrape_page that works within FastAPI.
-        """
-        try:
-            # Instead of creating a new event loop, use asyncio.run_coroutine_threadsafe
-            # if we're in an existing event loop
-            import asyncio
+#     def scrape_page(self, url: str, instructions: Optional[str] = None) -> Dict[str, Any]:
+#         """
+#         Synchronous wrapper for scrape_page that works within FastAPI.
+#         """
+#         try:
+#             # Instead of creating a new event loop, use asyncio.run_coroutine_threadsafe
+#             # if we're in an existing event loop
+#             import asyncio
             
-            try:
-                # Check if we're already in an event loop
-                current_loop = asyncio.get_event_loop()
-                if current_loop.is_running():
-                    # If we're in a running event loop (FastAPI), use a different approach
-                    import concurrent.futures
-                    import functools
+#             try:
+#                 # Check if we're already in an event loop
+#                 current_loop = asyncio.get_event_loop()
+#                 if current_loop.is_running():
+#                     # If we're in a running event loop (FastAPI), use a different approach
+#                     import concurrent.futures
+#                     import functools
                     
-                    # Create a new thread with its own event loop
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(
-                            lambda: asyncio.run(self.enhanced_client.scrape_page(url, instructions))
-                        )
-                        return future.result()
-                else:
-                    # If we're not in a running event loop, we can use run_until_complete
-                    return current_loop.run_until_complete(
-                        self.enhanced_client.scrape_page(url, instructions)
-                    )
-            except RuntimeError:
-                # If no event loop is set, create a new one
-                return asyncio.run(self.enhanced_client.scrape_page(url, instructions))
+#                     # Create a new thread with its own event loop
+#                     with concurrent.futures.ThreadPoolExecutor() as executor:
+#                         future = executor.submit(
+#                             lambda: asyncio.run(self.enhanced_client.scrape_page(url, instructions))
+#                         )
+#                         return future.result()
+#                 else:
+#                     # If we're not in a running event loop, we can use run_until_complete
+#                     return current_loop.run_until_complete(
+#                         self.enhanced_client.scrape_page(url, instructions)
+#                     )
+#             except RuntimeError:
+#                 # If no event loop is set, create a new one
+#                 return asyncio.run(self.enhanced_client.scrape_page(url, instructions))
                 
-        except Exception as e:
-            self.logger.error(f"Error in sync wrapper: {str(e)}")
-            return {
-                "url": url,
-                "error": f"Error processing page: {str(e)}"
-            }
+#         except Exception as e:
+#             self.logger.error(f"Error in sync wrapper: {str(e)}")
+#             return {
+#                 "url": url,
+#                 "error": f"Error processing page: {str(e)}"
+#             }
     
-    def export_to_json(self, data: Dict[str, Any], filepath: str) -> None:
-        """Wrapper for export_to_json."""
-        self.enhanced_client.export_to_json(data, filepath)
+#     def export_to_json(self, data: Dict[str, Any], filepath: str) -> None:
+#         """Wrapper for export_to_json."""
+#         self.enhanced_client.export_to_json(data, filepath)
     
-    def export_to_text(self, data: Dict[str, Any], filepath: str) -> None:
-        """Legacy method for backward compatibility."""
-        self.export_to_markdown(data, filepath)
+#     def export_to_text(self, data: Dict[str, Any], filepath: str) -> None:
+#         """Legacy method for backward compatibility."""
+#         self.export_to_markdown(data, filepath)
     
-    def export_to_markdown(self, data: Dict[str, Any], filepath: str) -> None:
-        """Wrapper for export_to_markdown."""
-        self.enhanced_client.export_to_markdown(data, filepath)
+#     def export_to_markdown(self, data: Dict[str, Any], filepath: str) -> None:
+#         """Wrapper for export_to_markdown."""
+#         self.enhanced_client.export_to_markdown(data, filepath)
 
 
 # Similarly, fix the CrawlerClient class

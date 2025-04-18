@@ -41,4 +41,4 @@ async def main(url):
         print (markdown_content)
 
 if __name__ == "__main__":
-    asyncio.run(main(url="https://ai.pydantic.dev/"))
+    asyncio.run(main(url="https://ai.pydantic.dev/changelog/"))
