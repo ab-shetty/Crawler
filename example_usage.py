@@ -1,9 +1,11 @@
 # Example usage as specified in the assignment
 import os
 from crawler import CrawlerClient
+from dotenv import load_dotenv
 
 def main():
     # Get API key from environment variable
+    load_dotenv()
     key = os.getenv('CRAWLER_API_KEY')
     
     # Initialize the client
