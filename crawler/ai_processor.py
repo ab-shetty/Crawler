@@ -336,3 +336,187 @@ class AiProcessor:
             self.logger.error(f"Error using OpenAI for query generation: {str(e)}")
             # Fallback to basic query
             return [f"site:{base_url} {instructions}"]
+
+
+    def analyze_dynamic_content(self, 
+                            before_html: str, 
+                            after_html: str, 
+                            instructions: str) -> Dict[str, Any]:
+        """
+        Analyze the difference between HTML before and after JavaScript execution
+        to identify dynamically loaded content that's relevant to instructions.
+        
+        Args:
+            before_html: HTML before JavaScript execution
+            after_html: HTML after JavaScript execution
+            instructions: User instructions
+            
+        Returns:
+            Dictionary with analysis of dynamic content changes
+        """
+        if not self.client:
+            return {"has_dynamic_content": False, "explanation": "No API key available for AI analysis"}
+            
+        try:
+            # Use BeautifulSoup to get text content
+            from bs4 import BeautifulSoup
+            
+            before_soup = BeautifulSoup(before_html, 'html.parser')
+            after_soup = BeautifulSoup(after_html, 'html.parser')
+            
+            before_text = before_soup.get_text(separator='\n', strip=True)
+            after_text = after_soup.get_text(separator='\n', strip=True)
+            
+            # For very large pages, truncate text for comparison
+            before_text = before_text[:10000]
+            after_text = after_text[:10000]
+            
+            # Calculate basic text length difference
+            len_before = len(before_text)
+            len_after = len(after_text)
+            text_diff_percent = ((len_after - len_before) / len_before * 100) if len_before > 0 else 0
+            
+            # If minimal difference, no need for AI analysis
+            if abs(text_diff_percent) < 5:
+                return {
+                    "has_dynamic_content": False,
+                    "explanation": f"Minimal content difference ({text_diff_percent:.1f}%)",
+                    "text_diff_percent": text_diff_percent
+                }
+            
+            # Prepare prompt for deeper AI analysis
+            prompt = f"""
+            You are analyzing the difference between a webpage before and after JavaScript execution.
+            
+            User Instructions: "{instructions}"
+            
+            Text content BEFORE JavaScript (excerpt):
+            {before_text[:2000]}...
+            
+            Text content AFTER JavaScript (excerpt):
+            {after_text[:2000]}...
+            
+            Analyze what significant content was added dynamically. 
+            Focus on content that might be relevant to the user's instructions.
+            
+            Format your response as JSON with these fields:
+            1. "has_dynamic_content": boolean, true if significant content was added
+            2. "relevance_to_instructions": 0-1 score indicating relevance of dynamic content to instructions
+            3. "dynamic_content_summary": Brief summary of key dynamic content added (1-2 sentences)
+            4. "wait_for_selectors": Array of likely CSS selectors for important dynamically loaded content
+            """
+            
+            # Call OpenAI API
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini-2024-07-18",
+                messages=[
+                    {"role": "system", "content": "You analyze dynamic web content differences."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.2,
+                max_tokens=400,
+                response_format={"type": "json_object"}
+            )
+            
+            # Extract the response
+            result_text = response.choices[0].message.content
+            result = json.loads(result_text)
+            
+            # Add basic stats to the result
+            result["text_diff_percent"] = text_diff_percent
+            result["before_length"] = len_before
+            result["after_length"] = len_after
+            
+            return result
+        
+        except Exception as e:
+            self.logger.error(f"Error analyzing dynamic content: {str(e)}")
+            return {
+                "has_dynamic_content": text_diff_percent > 10 if 'text_diff_percent' in locals() else False,
+                "explanation": f"Error during analysis: {str(e)}",
+                "text_diff_percent": text_diff_percent if 'text_diff_percent' in locals() else 0
+            }
+
+    def prioritize_links(self, 
+                        links: List[str], 
+                        page_title: str, 
+                        current_url: str,
+                        instructions: str) -> List[Tuple[str, float]]:
+        """
+        Prioritize links based on relevance to instructions.
+        
+        Args:
+            links: List of URLs to prioritize
+            page_title: Title of the current page
+            current_url: URL of the current page
+            instructions: User instructions
+            
+        Returns:
+            List of (url, score) tuples sorted by relevance
+        """
+        if not self.client or not links:
+            return [(link, 0.5) for link in links]  # Default equal priority
+        
+        try:
+            # Limit to 20 links for API efficiency
+            links_to_analyze = links[:20]
+            
+            # Extract link texts and paths for analysis
+            link_info = []
+            for link in links_to_analyze:
+                path = urlparse(link).path
+                # Convert path to readable text (e.g. '/products/details' -> 'products details')
+                link_text = ' '.join([part for part in path.split('/') if part])
+                link_info.append({"url": link, "text": link_text})
+            
+            # Prepare prompt for link prioritization
+            prompt = f"""
+            You are prioritizing which links to follow when crawling a website based on user instructions.
+            
+            Current page: "{page_title}" at {current_url}
+            
+            User instructions: "{instructions}"
+            
+            Links to prioritize:
+            {json.dumps(link_info, indent=2)}
+            
+            Based on the user instructions and link information, rank each link's relevance from 0.0 to 1.0.
+            Higher scores mean more likely to contain relevant information.
+            
+            Format your response as a JSON object with the URL as key and relevance score as value.
+            Example: {{"https://example.com/page1": 0.8, "https://example.com/page2": 0.3}}
+            """
+            
+            # Call OpenAI API
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini-2024-07-18",
+                messages=[
+                    {"role": "system", "content": "You prioritize links based on relevance to instructions."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=400,
+                response_format={"type": "json_object"}
+            )
+            
+            # Extract the response
+            result_text = response.choices[0].message.content
+            result = json.loads(result_text)
+            
+            # Convert to list of tuples and add any missing links with default score
+            prioritized_links = [(url, score) for url, score in result.items()]
+            
+            # Sort by score in descending order
+            prioritized_links.sort(key=lambda x: x[1], reverse=True)
+            
+            # Add any links that weren't in the first 20 with a default score
+            scored_urls = [url for url, _ in prioritized_links]
+            for link in links:
+                if link not in scored_urls:
+                    prioritized_links.append((link, 0.1))  # Low default priority
+            
+            return prioritized_links
+        
+        except Exception as e:
+            self.logger.error(f"Error prioritizing links: {str(e)}")
+            return [(link, 0.5) for link in links]  # Default equal priority

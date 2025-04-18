@@ -2,9 +2,11 @@
 
 import logging
 from urllib.parse import urljoin, urlparse
-from typing import List
+from typing import List, Optional
 
-from .config import LOGGING_LEVEL, LOG_FORMAT
+# Default logging settings
+LOGGING_LEVEL = logging.INFO
+LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
 def setup_logger(name: str) -> logging.Logger:
     """Sets up a standard logger."""
@@ -12,7 +14,7 @@ def setup_logger(name: str) -> logging.Logger:
     logger = logging.getLogger(name)
     return logger
 
-def normalize_url(base_url: str, link: str) -> str | None:
+def normalize_url(base_url: str, link: str) -> Optional[str]:
     """
     Normalizes a potentially relative URL against a base URL.
     Returns the absolute URL or None if the link is invalid or not HTTP/HTTPS.
@@ -59,6 +61,35 @@ def chunk_text(text: str, chunk_size: int = 5000) -> List[str]:
 
     while start < text_length:
         # Calculate end position
-        end = start + chunk_size
+        end = min(start + chunk_size, text_length)
+        
+        # If we're not at the end of the text, try to find a good break point
+        if end < text_length:
+            # Try to break at paragraph
+            paragraph_break = text.rfind('\n\n', start, end)
+            if paragraph_break != -1:
+                end = paragraph_break + 2  # Include the newlines
+            else:
+                # Try to break at sentence
+                sentence_break = text.rfind('. ', start, end)
+                if sentence_break != -1:
+                    end = sentence_break + 2  # Include the period and space
+                else:
+                    # Try to break at word
+                    space_break = text.rfind(' ', start, end)
+                    if space_break != -1:
+                        end = space_break + 1  # Include the space
+        
+        # Add the chunk
+        chunks.append(text[start:end])
+        start = end
+    
+    return chunks
 
-        # If we're
+def get_domain(url: str) -> str:
+    """Extract domain from URL."""
+    return urlparse(url).netloc
+
+def is_same_domain(url1: str, url2: str) -> bool:
+    """Check if two URLs have the same domain."""
+    return get_domain(url1) == get_domain(url2)

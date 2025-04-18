@@ -20,3 +20,7 @@ class ContentProcessingError(CrawlerError):
 class ConfigurationError(CrawlerError):
     """Raised for invalid configuration settings."""
     pass
+
+class RateLimitError(CrawlerError):
+    """Raised when the crawler is rate limited by the server."""
+    pass

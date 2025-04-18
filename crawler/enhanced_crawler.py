@@ -1,4 +1,4 @@
-# enhanced_crawler.py (Refactored for RAG-friendly Markdown)
+# enhanced_crawler.py
 
 import os
 import sys
@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from bs4 import BeautifulSoup
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
-from .exceptions import CrawlingError
+from .exceptions import CrawlerError, CrawlingError, RateLimitError
 from .utils import setup_logger, normalize_url, clean_text
 from .ai_processor import AiProcessor
 
@@ -96,70 +96,133 @@ class EnhancedCrawlerClient:
                 lines.append(f"```\n{text}\n```")
         return "\n\n".join(lines)
 
+    async def wait_for_dynamic_content(self, page, selectors=None, timeout=5000):
+        """
+        Wait for dynamic content to load based on selectors or a timeout.
+        
+        Args:
+            page: Playwright page object
+            selectors: List of CSS selectors to wait for
+            timeout: Maximum time to wait in milliseconds
+        """
+        if selectors:
+            for selector in selectors:
+                try:
+                    await page.wait_for_selector(selector, timeout=timeout)
+                except Exception as e:
+                    self.logger.warning(f"Timeout waiting for selector '{selector}': {e}")
+        else:
+            # Generic wait for network idle and DOM content
+            try:
+                await page.wait_for_load_state("networkidle", timeout=timeout)
+            except Exception as e:
+                self.logger.warning(f"Timeout waiting for network idle: {e}")
+    
+    async def _handle_rate_limiting(self, url, retry_count=0, max_retries=3, initial_delay=2):
+        """
+        Handle rate limiting with exponential backoff.
+        
+        Args:
+            url: The URL being crawled
+            retry_count: Current retry attempt
+            max_retries: Maximum number of retries
+            initial_delay: Initial delay in seconds
+            
+        Returns:
+            True if should retry, False if max retries exceeded
+            
+        Raises:
+            RateLimitError: If max retries exceeded
+        """
+        if retry_count >= max_retries:
+            raise RateLimitError(f"Rate limit exceeded for {url} after {max_retries} retries")
+        
+        delay = initial_delay * (2 ** retry_count)
+        self.logger.warning(f"Rate limited for {url}. Retrying in {delay}s (attempt {retry_count+1}/{max_retries})")
+        await asyncio.sleep(delay)
+        return True
+
     async def scrape_page(self, url: str, instructions: Optional[str] = None) -> Dict[str, Any]:
         self.logger.info(f"Scraping URL: {url}")
-        try:
-            await self._ensure_crawler_initialized()
-            session_id = f"session_{int(time.time())}"
-            result = await self._crawler.arun(url=url, config=self.crawl_config, session_id=session_id)
+        retry_count = 0
+        max_retries = 3
+        
+        while True:
+            try:
+                await self._ensure_crawler_initialized()
+                session_id = f"session_{int(time.time())}"
+                result = await self._crawler.arun(url=url, config=self.crawl_config, session_id=session_id)
 
-            if not result.success:
-                raise CrawlingError(url, result.error_message or "Unknown error")
+                if not result.success:
+                    # Check for rate limiting patterns
+                    if "429" in str(result.error_message) or "rate limit" in str(result.error_message).lower():
+                        await self._handle_rate_limiting(url, retry_count, max_retries)
+                        retry_count += 1
+                        continue
+                    raise CrawlingError(url, result.error_message or "Unknown error")
 
-            html_content = result.html
-            soup = BeautifulSoup(html_content, 'html.parser')
-            title = self._extract_title(soup)
-            links = self._extract_links(soup, base_url=url)
-            structured_markdown = self._extract_structured_markdown(soup)
+                html_content = result.html
+                soup = BeautifulSoup(html_content, 'html.parser')
+                title = self._extract_title(soup)
+                links = self._extract_links(soup, base_url=url)
+                structured_markdown = self._extract_structured_markdown(soup)
 
-            content_sample = structured_markdown[:5000] if instructions else ""
-            relevance_score, relevance_reason = (1.0, "No instructions") if not instructions else self.ai_processor.analyze_relevance(
-                content=content_sample,
-                title=title,
-                instructions=instructions
-            )
-
-            if relevance_score >= 0.3:
-                ai_extracted_content = self.ai_processor.extract_structured_content(
-                    html_content=html_content,
+                content_sample = structured_markdown[:5000] if instructions else ""
+                relevance_score, relevance_reason = (1.0, "No instructions") if not instructions else self.ai_processor.analyze_relevance(
+                    content=content_sample,
                     title=title,
-                    url=url,
-                    instructions=instructions or "Extract main content"
+                    instructions=instructions
                 )
-                result_data = {
-                    "url": url,
-                    "title": title,
-                    "markdown": structured_markdown,
-                    "links": links[:20],
-                    "relevance": {
-                        "score": relevance_score,
-                        "reason": relevance_reason
-                    },
-                    "ai_extracted_content": ai_extracted_content,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
-            else:
-                result_data = {
-                    "url": url,
-                    "title": title,
-                    "links": links[:20],
-                    "relevance": {
-                        "score": relevance_score,
-                        "reason": relevance_reason
-                    },
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
 
-            return result_data
+                if relevance_score >= 0.3:
+                    ai_extracted_content = self.ai_processor.extract_structured_content(
+                        html_content=html_content,
+                        title=title,
+                        url=url,
+                        instructions=instructions or "Extract main content"
+                    )
+                    result_data = {
+                        "url": url,
+                        "title": title,
+                        "markdown": structured_markdown,
+                        "links": links[:20],
+                        "relevance": {
+                            "score": relevance_score,
+                            "reason": relevance_reason
+                        },
+                        "ai_extracted_content": ai_extracted_content,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                else:
+                    result_data = {
+                        "url": url,
+                        "title": title,
+                        "links": links[:20],
+                        "relevance": {
+                            "score": relevance_score,
+                            "reason": relevance_reason
+                        },
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
 
-        except CrawlingError as e:
-            self.logger.error(f"Crawling error for {url}: {str(e)}")
-            return {"url": url, "error": f"Failed to crawl page: {str(e)}"}
-        except Exception as e:
-            self.logger.error(f"Error processing {url}: {str(e)}")
-            return {"url": url, "error": f"Error processing page: {str(e)}"}
+                return result_data
 
-    async def scrape(self, url: str, instructions: str, depth: int = 1, follow_external_links: bool = False, max_pages: int = 20) -> Dict[str, Any]:
+            except RateLimitError as e:
+                # This means we've already hit max retries
+                self.logger.error(f"{e}")
+                return {"url": url, "error": str(e)}
+            except CrawlingError as e:
+                self.logger.error(f"Crawling error for {url}: {str(e)}")
+                return {"url": url, "error": f"Failed to crawl page: {str(e)}"}
+            except Exception as e:
+                self.logger.error(f"Error processing {url}: {str(e)}")
+                return {"url": url, "error": f"Error processing page: {str(e)}"}
+
+    async def scrape_async(self, url: str, instructions: str = None, depth: int = 1,
+                           follow_external_links: bool = False, max_pages: int = 20) -> Dict[str, Any]:
+        """
+        Async version of the scrape method.
+        """
         start_time = time.time()
         self.logger.info(f"Starting crawl of {url} with depth {depth}")
 
@@ -200,6 +263,7 @@ class EnhancedCrawlerClient:
                 "depth": depth,
                 "follow_external_links": follow_external_links,
                 "pages_crawled": len(results),
+                "time_taken": time.time() - start_time,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             },
             "pages": results
@@ -207,6 +271,149 @@ class EnhancedCrawlerClient:
 
         self.logger.info(f"Crawl completed. Scraped {len(results)} pages.")
         return result
+    
+    def scrape(self, url: str, instructions: str = None, depth: int = 1, 
+               follow_external_links: bool = False, max_pages: int = 20) -> Dict[str, Any]:
+        """
+        Synchronous interface for scraping a website.
+        
+        Args:
+            url: The URL to start scraping from
+            instructions: Natural language instructions for what to extract
+            depth: How many levels of links to follow
+            follow_external_links: Whether to follow links to external domains
+            max_pages: Maximum number of pages to scrape
+                
+        Returns:
+            A dictionary containing the scraped data and metadata
+        """
+        # Create an event loop if there isn't one
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # Run the async method in the event loop
+        if loop.is_running():
+            # If we're already in an event loop (e.g., inside FastAPI)
+            return asyncio.create_task(
+                self.scrape_async(url, instructions, depth, follow_external_links, max_pages)
+            )
+        else:
+            return loop.run_until_complete(
+                self.scrape_async(url, instructions, depth, follow_external_links, max_pages)
+            )
+
+    def create_rag_documents(self, crawl_result: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Convert crawled data into a format optimized for RAG systems.
+        
+        Args:
+            crawl_result: The result from a crawl operation
+            
+        Returns:
+            A list of RAG-friendly document chunks with metadata
+        """
+        rag_documents = []
+        
+        for page in crawl_result.get('pages', []):
+            if 'error' in page:
+                continue
+                
+            # Extract content from the page
+            content = page.get('markdown', '')
+            
+            # If AI extraction is available, use it
+            if 'ai_extracted_content' in page:
+                ai_content = page['ai_extracted_content']
+                
+                # Add summary as a high-value chunk
+                if 'summary' in ai_content:
+                    rag_documents.append({
+                        'chunk_type': 'summary',
+                        'content': ai_content['summary'],
+                        'metadata': {
+                            'source_url': page['url'],
+                            'source_title': page.get('title', ''),
+                            'chunk_type': 'summary',
+                            'relevance_score': page.get('relevance', {}).get('score', 1.0),
+                            'timestamp': page.get('timestamp', '')
+                        }
+                    })
+                
+                # Add key points as individual chunks
+                if 'key_points' in ai_content and ai_content['key_points']:
+                    for i, point in enumerate(ai_content['key_points']):
+                        rag_documents.append({
+                            'chunk_type': 'key_point',
+                            'content': point,
+                            'metadata': {
+                                'source_url': page['url'],
+                                'source_title': page.get('title', ''),
+                                'chunk_type': 'key_point',
+                                'point_index': i,
+                                'relevance_score': page.get('relevance', {}).get('score', 1.0),
+                                'timestamp': page.get('timestamp', '')
+                            }
+                        })
+            
+            # Split content into chunks
+            if content:
+                chunks = self._chunk_content(content)
+                for i, chunk in enumerate(chunks):
+                    rag_documents.append({
+                        'chunk_type': 'content',
+                        'content': chunk,
+                        'metadata': {
+                            'source_url': page['url'],
+                            'source_title': page.get('title', ''),
+                            'chunk_type': 'content',
+                            'chunk_index': i,
+                            'relevance_score': page.get('relevance', {}).get('score', 1.0),
+                            'timestamp': page.get('timestamp', '')
+                        }
+                    })
+        
+        return rag_documents
+
+    def _chunk_content(self, content: str, chunk_size: int = 1000, overlap: int = 100) -> List[str]:
+        """
+        Split content into overlapping chunks for RAG.
+        
+        Args:
+            content: Text content to split
+            chunk_size: Maximum size of each chunk
+            overlap: Number of characters to overlap between chunks
+            
+        Returns:
+            List of text chunks
+        """
+        chunks = []
+        start = 0
+        content_length = len(content)
+        
+        while start < content_length:
+            end = start + chunk_size
+            if end >= content_length:
+                chunks.append(content[start:])
+                break
+            
+            # Try to break at paragraph or sentence
+            break_point = content.rfind('\n\n', start, end)
+            if break_point == -1:
+                break_point = content.rfind('. ', start, end)
+            if break_point == -1:
+                break_point = content.rfind(' ', start, end)
+            if break_point == -1:
+                break_point = end
+            else:
+                break_point += 1  # Include the space or period
+            
+            chunks.append(content[start:break_point])
+            start = break_point - overlap
+        
+        return chunks
 
     def export_to_markdown(self, data: Dict[str, Any], filepath: str) -> None:
         os.makedirs(os.path.dirname(os.path.abspath(filepath)), exist_ok=True)
@@ -253,4 +460,3 @@ class EnhancedCrawlerClient:
                 f.write("\n---\n\n")
 
         self.logger.info(f"Data exported to {filepath}")
-
